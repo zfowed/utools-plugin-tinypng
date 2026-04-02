@@ -1,6 +1,6 @@
 <template>
   <div class="compress-item">
-    <img :src="data.path" :alt="data.name" />
+    <img :src="toFileUrlIfLocal(data.path)" :alt="data.name" />
     <p>{{ data.name }}</p>
     <span>{{ bytes(data.size) }}</span>
     <span>{{ data.compress?.size ? bytes(data.compress.size) : '-' }}</span>
@@ -119,6 +119,30 @@ const props = defineProps({
 defineEmits(['cancel', 'refresh']);
 
 const progress = computed(() => (props.data.compress?.progress ?? 0) * 100 + '%');
+
+function toFileUrlIfLocal(input: string) {
+  const p = (input ?? '').trim();
+  if (!p) return p;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(p)) return p;
+
+  const looksLikeWindowsDrive = /^[a-zA-Z]:[\\/]/.test(p);
+  const looksLikeUnc = /^\\\\/.test(p);
+  const looksLikePosixAbs = p.startsWith('/');
+
+  if (!(looksLikeWindowsDrive || looksLikeUnc || looksLikePosixAbs)) return p;
+
+  if (looksLikeWindowsDrive) {
+    const normalized = p.replace(/\\/g, '/'); // C:\a\b -> C:/a/b
+    return `file:///${normalized}`;
+  }
+
+  if (looksLikeUnc) {
+    const normalized = p.replace(/\\/g, '/'); // \\server\share -> //server/share
+    return `file:${normalized}`;
+  }
+
+  return `file://${p}`;
+}
 
 function handleCopy() {
   utools.copyFile(props.data.compress.path) ? ElMessage.success('复制成功！') : ElMessage.error('复制失败！');
